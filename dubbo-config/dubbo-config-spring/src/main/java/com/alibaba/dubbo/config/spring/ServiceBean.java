@@ -31,7 +31,6 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
-import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.support.AbstractApplicationContext;
@@ -47,11 +46,13 @@ import java.util.Map;
  * @author william.liangf
  * @export
  */
-public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean, DisposableBean, ApplicationContextAware, ApplicationListener, BeanNameAware {
+public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean, DisposableBean, ApplicationContextAware, ApplicationListener<ContextRefreshedEvent>, BeanNameAware {
 
     private static final long serialVersionUID = 213195494150089726L;
 
     private static transient ApplicationContext SPRING_CONTEXT;
+
+    private final transient Service service;
 
     private transient ApplicationContext applicationContext;
 
@@ -61,10 +62,12 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
 
     public ServiceBean() {
         super();
+        this.service = null;
     }
 
     public ServiceBean(Service service) {
         super(service);
+        this.service = service;
     }
 
     public static ApplicationContext getSpringContext() {
@@ -100,14 +103,21 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         this.beanName = name;
     }
 
-    public void onApplicationEvent(ApplicationEvent event) {
-        if (ContextRefreshedEvent.class.getName().equals(event.getClass().getName())) {
-            if (isDelay() && !isExported() && !isUnexported()) {
-                if (logger.isInfoEnabled()) {
-                    logger.info("The service ready on spring started. service: " + getInterface());
-                }
-                export();
+    /**
+     * Gets associated {@link Service}
+     *
+     * @return associated {@link Service}
+     */
+    public Service getService() {
+        return service;
+    }
+
+    public void onApplicationEvent(ContextRefreshedEvent event) {
+        if (isDelay() && !isExported() && !isUnexported()) {
+            if (logger.isInfoEnabled()) {
+                logger.info("The service ready on spring started. service: " + getInterface());
             }
+            export();
         }
     }
 
@@ -117,7 +127,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         if (delay == null && provider != null) {
             delay = provider.getDelay();
         }
-        return supportedApplicationListener && (delay == null || delay.intValue() == -1);
+        return supportedApplicationListener && (delay == null || delay == -1);
     }
 
     @SuppressWarnings({"unchecked", "deprecation"})
